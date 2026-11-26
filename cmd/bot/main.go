@@ -3,15 +3,17 @@ package main
 import (
 	"github.com/JaKoSTaWiND/polymarket_bot/internal"
 	"github.com/JaKoSTaWiND/polymarket_bot/internal/di"
+	di_actors "github.com/JaKoSTaWiND/polymarket_bot/internal/di/actors"
 	di_observability "github.com/JaKoSTaWiND/polymarket_bot/internal/di/observability"
 	di_sdk "github.com/JaKoSTaWiND/polymarket_bot/internal/di/sdk"
 	di_states "github.com/JaKoSTaWiND/polymarket_bot/internal/di/states"
 	di_transport_http "github.com/JaKoSTaWiND/polymarket_bot/internal/di/transport/http"
 	di_transport_ws "github.com/JaKoSTaWiND/polymarket_bot/internal/di/transport/ws"
+	di_usecases "github.com/JaKoSTaWiND/polymarket_bot/internal/di/usecases"
 	"go.uber.org/fx"
 )
 
-func Main() {
+func main() {
 	BoostrapSettings := internal.LoadBootstrapSettings()
 	App := fx.New(
 		di.BootstrapSettingsProvider(&BoostrapSettings), // Boostrap Settings
@@ -25,10 +27,18 @@ func Main() {
 		//место под http server
 
 		// STATES
-		di_states.GeneralStateProvider(),
+		di_states.GeneralStateProvider(), // General State
+		di_states.ApisStateProvider(),    // APIs State
 
 		// SDK
 		di_sdk.SDKClientProvider(), // SDK Client
+
+		// USECASES
+		di_usecases.LifecycleUCsProvider(), // Lifecycle Usecases
+		di_usecases.SDKUCsProvider(),       // SDK Usecases
+
+		// ACTORS
+		di_actors.GeneralActorProvider(), // General Actor
 	)
 
 	App.Run()

@@ -19,13 +19,17 @@ type Lifecycle struct {
 }
 
 func (Lifecycle *Lifecycle) EnsureStatus(ctx context.Context, Allowed ...string) error {
-	CurrentStatus := Lifecycle.GeneralState.BotID
+	CurrentStatus := Lifecycle.GeneralState.BotStatus
+
+	if len(Allowed) == 0 {
+		return nil
+	}
 
 	for _, Status := range Allowed {
 		if CurrentStatus == Status {
 			Lifecycle.Logger.DebugContext(
 				ctx, "Проверка статуса",
-				"operation", "lifecycle_ensure_status",
+				"operation", "Lifecycle.EnsureStatus",
 				"current_bot_status", CurrentStatus,
 			)
 			return nil
@@ -51,11 +55,11 @@ func (Lifecycle *Lifecycle) ChangeStatus(
 		return err
 	}
 
-	PreviousStatus := Lifecycle.GeneralState.BotID
-	Lifecycle.GeneralState.BotID = RequestStatus
+	PreviousStatus := Lifecycle.GeneralState.BotStatus
+	Lifecycle.GeneralState.BotStatus = RequestStatus
 	Lifecycle.Logger.InfoContext(
 		ctx, "Статус бота изменен",
-		"operation", "lifecycle_change_status",
+		"operation", "Lifecycle.ChangeStatus",
 		"previous_status", PreviousStatus,
 		"new_status", RequestStatus,
 	)

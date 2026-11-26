@@ -9,18 +9,18 @@
         },
         {
             "title": "To-Do",
+            "tasks": [],
+            "id": "lsqut5aux42l10j06ef8vwgh",
+            "color": "#fcb900"
+        },
+        {
+            "title": "Doing",
             "tasks": [
                 {
                     "text": "запуск бота:\n- lifecycle меняет состояние бота\n-  user subscribe channel\n- usecase типа  user subscribe channel\n- general actor при запуске вызывает юзкейс",
                     "id": "zzu7izgen32denvspq06y19k"
                 }
             ],
-            "id": "lsqut5aux42l10j06ef8vwgh",
-            "color": "#fcb900"
-        },
-        {
-            "title": "Doing",
-            "tasks": [],
             "id": "v5mgavvt13n617kd9i57llge",
             "color": "#0693e3"
         },
@@ -33,5 +33,5 @@
     ],
     "autosave": true,
     "saveToFile": true,
-    "timestamp": 1795651522000
+    "timestamp": 1795662094607
 }

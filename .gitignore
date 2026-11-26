@@ -28,6 +28,10 @@ go.work.sum
 # env file
 .env
 .env.dev
+.env.prod
+/.venv/
+/.clob-keys-*/
+__pycache__/
 
 # Editor/IDE
 .idea/
