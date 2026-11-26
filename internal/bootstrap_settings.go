@@ -5,6 +5,7 @@ import "os"
 type BootstrapSettings struct {
 	Stage                    string // Окружение приложения из STAGE.
 	LoggerLevel              string // Минимальный уровень OTel Logs из LOGGER_LEVEL (DEBUG или INFO).
+	PolyWalletAddress        string
 	PolyRelayerApiKey        string
 	PolyRelayerApiKeyAddress string
 	PolyApiKey               string
@@ -18,6 +19,7 @@ func LoadBootstrapSettings() BootstrapSettings {
 	return BootstrapSettings{
 		Stage:                    os.Getenv("STAGE"),
 		LoggerLevel:              os.Getenv("LOGGER_LEVEL"),
+		PolyWalletAddress:        os.Getenv("POLY_WALLET_ADDRESS"),
 		PolyRelayerApiKey:        os.Getenv("POLY_RELAYER_API_KEY"),
 		PolyRelayerApiKeyAddress: os.Getenv("POLY_RELAYER_API_KEY_ADDRESS"),
 		PolyApiKey:               os.Getenv("POLY_API_KEY"),

@@ -8,6 +8,7 @@ import (
 type GeneralState struct {
 	BotID     string
 	BotStatus string
+	Balance   int64 // Последний полученный баланс в миллионных долях pUSD. Для конкурентного чтения используйте atomic.LoadInt64.
 }
 
 func GenerateBotID() (string, error) {

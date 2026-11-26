@@ -18,7 +18,13 @@ type GeneralActor struct {
 }
 
 func (GeneralActor *GeneralActor) StartBot(ctx context.Context) error {
-	// sdk запрос на получение баланса (портфолио) (пока пропустим)
+	// sdk запрос на получение баланса +
 
-	return GeneralActor.UCS.StartBotUC.Execute(ctx)
+	// подписывается на user channel +
+
+	// получениие позиций +
+
+	// создать акторов исходя из полученных позиций, причем если есть 2 позиции на 1 condition_id то для них создается 1 актор и принимает обе позиции в себя
+
+	// если есть открытые позиции, то делает market channel subscribe на них
 }
