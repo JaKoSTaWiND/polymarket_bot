@@ -9,5 +9,7 @@ func WebSocketProvider() fx.Option {
 	return fx.Supply(
 		sdk_websocket.UserChannelSubscribe,
 		sdk_websocket.ReadUserChannel,
+		sdk_websocket.MarketChannelSubscribe,
+		sdk_websocket.MarketChannelUpdate,
 	)
 }

@@ -10,14 +10,14 @@ import (
 
 const URL = "wss://ws-subscriptions-clob.polymarket.com/ws/user"
 
-type Auth struct {
+type UserChannelAuth struct {
 	ApiKey     string `json:"apiKey"`
 	Secret     string `json:"secret"`
 	Passphrase string `json:"passphrase"`
 }
 
-type SubscriptionRequest struct {
-	Auth    Auth     `json:"auth"`
+type UserChannelSubscriptionRequest struct {
+	Auth    UserChannelAuth     `json:"auth"`
 	Type    string   `json:"type"`
 	Markets []string `json:"markets,omitempty"`
 }
@@ -25,13 +25,13 @@ type SubscriptionRequest struct {
 func UserChannelSubscribe(
 	ctx context.Context,
 	Dialer *websocket.Dialer,
-	SubscriptionRequest SubscriptionRequest,
+	UserChannelSubscriptionRequest UserChannelSubscriptionRequest,
 ) (*websocket.Conn, error) {
 	Conn, _, err := Dialer.DialContext(ctx, URL, nil)
 	if err != nil {
 		return nil, err
 	}
-	if err := Conn.WriteJSON(SubscriptionRequest); err != nil {
+	if err := Conn.WriteJSON(UserChannelSubscriptionRequest); err != nil {
 		Conn.Close()
 		return nil, err
 	}

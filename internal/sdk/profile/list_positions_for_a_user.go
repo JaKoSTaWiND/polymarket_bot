@@ -1,6 +1,7 @@
 package sdk_profile
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -16,16 +17,31 @@ import (
 //
 //	OPEN (включая архивные рынки) -> CLOSED (только wallet) -> JSON
 func ListPositionsForAUser(wallet string) (json.RawMessage, error) {
-	client := transport_http.HttpClient()
+	positions, err := listPositions(context.Background(), transport_http.HttpClient(), wallet, "OPEN", "CLOSED")
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(positions)
+}
+
+// ListOpenPositionsForAUser читает через client все страницы OPEN для wallet, включая дробные остатки.
+// ctx отменяет любой запрос. Каждая позиция сохраняет исходные поля и точность чисел Data API.
+func ListOpenPositionsForAUser(ctx context.Context, client *http.Client, wallet string) ([]json.RawMessage, error) {
+	return listPositions(ctx, client, wallet, "OPEN")
+}
+
+// listPositions загружает через client позиции wallet по выбранным statuses; ошибка отменяет весь результат.
+func listPositions(ctx context.Context, client *http.Client, wallet string, statuses ...string) ([]json.RawMessage, error) {
 	positions := make([]json.RawMessage, 0)
-	for _, status := range []string{"OPEN", "CLOSED"} {
+	for _, status := range statuses {
 		query := url.Values{"user": {wallet}, "status": {status}, "limit": {"1000"}}
 		if status == "OPEN" {
 			query.Set("include_archived", "true")
 			query.Set("filter_amount", "0")
 		}
+		seen := make(map[string]struct{})
 		for {
-			rows, next, err := getPositionsPage(client, query)
+			rows, next, err := getPositionsPage(ctx, client, query)
 			if err != nil {
 				return nil, fmt.Errorf("позиции %s: %w", status, err)
 			}
@@ -47,17 +63,25 @@ func ListPositionsForAUser(wallet string) (json.RawMessage, error) {
 			if next == "" {
 				break
 			}
+			if _, repeated := seen[next]; repeated {
+				return nil, fmt.Errorf("позиции %s: повтор курсора", status)
+			}
+			seen[next] = struct{}{}
 			query.Set("cursor", next)
 		}
 	}
-	return json.Marshal(positions)
+	return positions, nil
 }
 
 // getPositionsPage запрашивает через client страницу по query и возвращает позиции и следующий курсор.
 // Пустой курсор завершает обход. Ошибка HTTP или формата ответа прерывает его.
-func getPositionsPage(client *http.Client, query url.Values) ([]json.RawMessage, string, error) {
+func getPositionsPage(ctx context.Context, client *http.Client, query url.Values) ([]json.RawMessage, string, error) {
 	const endpoint = "https://data-api.polymarket.com/v2/positions"
-	resp, err := client.Get(endpoint + "?" + query.Encode())
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint+"?"+query.Encode(), nil)
+	if err != nil {
+		return nil, "", err
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, "", err
 	}

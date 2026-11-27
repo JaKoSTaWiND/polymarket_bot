@@ -6,12 +6,12 @@ import (
 	"github.com/JaKoSTaWiND/polymarket_bot/internal"
 	"github.com/JaKoSTaWiND/polymarket_bot/internal/di"
 	di_actors "github.com/JaKoSTaWiND/polymarket_bot/internal/di/actors"
+	di_lifecycle "github.com/JaKoSTaWiND/polymarket_bot/internal/di/lifecycle"
 	di_observability "github.com/JaKoSTaWiND/polymarket_bot/internal/di/observability"
 	di_sdk "github.com/JaKoSTaWiND/polymarket_bot/internal/di/sdk"
 	di_states "github.com/JaKoSTaWiND/polymarket_bot/internal/di/states"
 	di_transport_http "github.com/JaKoSTaWiND/polymarket_bot/internal/di/transport/http"
 	di_transport_ws "github.com/JaKoSTaWiND/polymarket_bot/internal/di/transport/ws"
-	di_usecases "github.com/JaKoSTaWiND/polymarket_bot/internal/di/usecases"
 	"go.uber.org/fx"
 )
 
@@ -41,13 +41,18 @@ func main() {
 		di_sdk.WebSocketProvider(),
 		di_sdk.OtherProvider(),
 
-		// USECASES
-		di_usecases.LifecycleUCsProvider(), // Lifecycle Usecases
-		di_usecases.SDKUCsProvider(),       // SDK Usecases
+		// LIFECYCLE
+		fx.Provide(di_lifecycle.LifecycleProvider),
 
 		// ACTORS
 		di_actors.GeneralActorProvider(), // General Actor
 	)
 
 	App.Run()
+
+
+	// тут будет запуск бота
+	// Lifecycle.StartBot()
+	// GeneralActor.StartBot()
+
 }

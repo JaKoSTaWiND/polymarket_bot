@@ -8,5 +8,6 @@ import (
 func ProfileProvider() fx.Option {
 	return fx.Supply(
 		sdk_profile.ListPositionsForAUser,
+		sdk_profile.ListOpenPositionsForAUser,
 	)
 }

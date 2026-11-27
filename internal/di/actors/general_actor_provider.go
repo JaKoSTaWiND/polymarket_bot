@@ -3,15 +3,45 @@ package di_actors
 import (
 	"context"
 	"log/slog"
+	"net/http"
 
 	actors_general "github.com/JaKoSTaWiND/polymarket_bot/internal/actors/general"
+	"github.com/JaKoSTaWiND/polymarket_bot/internal/lifecycle"
+	"github.com/JaKoSTaWiND/polymarket_bot/internal/states"
+	"github.com/gorilla/websocket"
 	"go.uber.org/fx"
 )
 
-func CreateGeneralActor(logger *slog.Logger, startBot *usecases_lifecycle.StartBotUC) *actors_general.GeneralActor {
+// CreateGeneralActor получает из Fx состояние бота, HTTP-клиент и операции SDK для снимка аккаунта и двух WebSocket-каналов.
+func CreateGeneralActor(
+	logger *slog.Logger,
+	state *states.GeneralState,
+	botLifecycle *lifecycle.Lifecycle,
+	dialer *websocket.Dialer,
+	subscribe actors_general.MarketSubscribeFunc,
+	update actors_general.MarketUpdateFunc,
+	apis *states.ApisState,
+	client *http.Client,
+	balance actors_general.BalanceFunc,
+	positions actors_general.OpenPositionsFunc,
+	subscribeUser actors_general.UserSubscribeFunc,
+	readUser actors_general.UserReadFunc,
+) *actors_general.GeneralActor {
 	return &actors_general.GeneralActor{
-		Logger: logger,
-		UCS:    actors_general.UCS{StartBotUC: startBot},
+		Logger:       logger,
+		GeneralState: state,
+		Lifecycle:    botLifecycle,
+
+		APIs:          apis,
+		HTTPClient:    client,
+		GetBalance:    balance,
+		OpenPositions: positions,
+		SubscribeUser: subscribeUser,
+		ReadUser:      readUser,
+
+		WSDialer:        dialer,
+		SubscribeMarket: subscribe,
+		UpdateMarket:    update,
 	}
 }
 
@@ -38,6 +68,7 @@ func registerGeneralActor(lifecycle fx.Lifecycle, actor *actors_general.GeneralA
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
+			defer actor.CloseMarketChannel()
 			cancel()
 			select {
 			case <-stopped:
