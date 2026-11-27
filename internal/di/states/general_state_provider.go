@@ -27,7 +27,7 @@ func CreateGeneralState(settings *internal.BootstrapSettings) (*states.GeneralSt
 	return &states.GeneralState{
 		BotID:                     botID,
 		BotStatus:                 lifecycle.STARTED,
-		MarketActorsByConditionID: make(map[string]actors_market.MarketActor, limit),
+		MarketActorsByConditionID: make(map[string]*actors_market.MarketActor, limit),
 		MaxTrackingMarkets:        limit,
 	}, nil
 }

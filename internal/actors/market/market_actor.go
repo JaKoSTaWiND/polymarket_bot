@@ -8,13 +8,17 @@ import (
 
 // MarketActor представляет актор одного рынка.
 type MarketActor struct {
-	Logger    *slog.Logger // Логгер для событий рынка.
-	Market    entities.Market
-	Positions []entities.Position
+	Logger    *slog.Logger        // Логгер для событий рынка.
+	Market    entities.Market     // Данные рынка и его исходов.
+	Positions []entities.Position // Локальные позиции обоих исходов.
 	// Orders []entities.Order (в будущем)
 }
 
-// CreateMarketActor возвращает актор рынка с переданным логгером logger.
-func CreateMarketActor(logger *slog.Logger) *MarketActor {
-	return &MarketActor{Logger: logger}
+// CreateMarketActor создаёт актор для market с журналом logger и пустым слайсом позиций.
+func CreateMarketActor(logger *slog.Logger, market entities.Market) *MarketActor {
+	return &MarketActor{
+		Logger:    logger,
+		Market:    market,
+		Positions: []entities.Position{},
+	}
 }
