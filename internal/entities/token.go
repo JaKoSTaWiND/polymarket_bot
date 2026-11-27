@@ -3,5 +3,5 @@ package entities
 type Token struct {
 	AssetID string
 	Outcome string
-	Price   uint64
+	Price   int64 // Цена в микро-pUSD за один токен.
 }

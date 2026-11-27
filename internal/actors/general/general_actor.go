@@ -85,7 +85,7 @@ func (actor *GeneralActor) StartBot(ctx context.Context) error {
 	}
 
 	atomic.StoreUint64(&actor.GeneralState.Balance, balance)
-	actor.Logger.InfoContext(ctx, "Получен стартовый баланс", "balance_micro_pusd", balance)
+	actor.Logger.InfoContext(ctx, "Получен стартовый баланс", "balance", balance)
 
 	// ReadUser поддерживает соединение и закрывает его перед возвратом.
 	err = actor.ReadUser(ctx, conn, func(ctx context.Context, payload []byte) error {
