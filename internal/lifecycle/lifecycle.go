@@ -10,9 +10,9 @@ import (
 )
 
 var (
-	ENSURE_STATUS_ERROR = "Lifecycle: Не удалось изменить статус с %s; Доступные статусы: %s"
+	ENSURE_STATUS_ERR = "Lifecycle: Не удалось изменить статус с %s; Доступные статусы: %s"
+	CHANGE_STATUS_ERR = "StartBotUC: Не удалось поменять статус"
 )
-
 type Lifecycle struct {
 	Logger       *slog.Logger
 	GeneralState *states.GeneralState
@@ -39,7 +39,7 @@ func (Lifecycle *Lifecycle) EnsureStatus(ctx context.Context, Allowed ...string)
 	for _, Status := range Allowed {
 		AllowedNames = append(AllowedNames, Status)
 	}
-	return fmt.Errorf(ENSURE_STATUS_ERROR, CurrentStatus, strings.Join(AllowedNames, ", "))
+	return fmt.Errorf(ENSURE_STATUS_ERR, CurrentStatus, strings.Join(AllowedNames, ", "))
 }
 
 func (Lifecycle *Lifecycle) ChangeStatus(
@@ -61,5 +61,22 @@ func (Lifecycle *Lifecycle) ChangeStatus(
 		"previous_status", PreviousStatus,
 		"new_status", RequestStatus,
 	)
+	return nil
+}
+
+func (Lifecycle *Lifecycle) StartBot(ctx context.Context) error {
+	Logger := Lifecycle.Logger.With("operation", "Lifecycle.StartBot")
+	// поменять статус
+	err := Lifecycle.ChangeStatus(
+		ctx,
+		STARTED,
+	)
+	if err != nil {
+		Logger.ErrorContext(
+			ctx, CHANGE_STATUS_ERR,
+			"error", err,
+		)
+		return fmt.Errorf(CHANGE_STATUS_ERR)
+	}
 	return nil
 }

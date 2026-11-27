@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 
+	actors_market "github.com/JaKoSTaWiND/polymarket_bot/internal/actors/market"
 	usecases_lifecycle "github.com/JaKoSTaWiND/polymarket_bot/internal/usecases/lifecycle"
 )
 
@@ -30,10 +31,17 @@ func (GeneralActor *GeneralActor) StartBot(ctx context.Context) error {
 	return nil
 }
 
-func CreateMarketActor(ConditionID string)
-	// создает маркет актора и присваивает ключ ConditionID
+func (actor *GeneralActor) CreateMarketActor(ConditionID string) {
+	state := actor.StartBotUC.GeneralState
+	if _, exists := state.MarketActorsByConditionID[ConditionID]; exists {
+		return
+	}
+	if len(state.MarketActorsByConditionID) >= state.MaxTrackingMarkets {
+		return
+	}
 
-	// добавляет их в GeneralState
+	state.MarketActorsByConditionID[ConditionID] = *actors_market.CreateMarketActor(actor.Logger)
+}
 
 func CreateMarketActors(...ConditionIDS string, ...AssetIDS string) 
 	/* 
