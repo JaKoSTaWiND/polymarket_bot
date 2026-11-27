@@ -4,19 +4,19 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/JaKoSTaWiND/polymarket_bot/internal/actors"
+	actors_general "github.com/JaKoSTaWiND/polymarket_bot/internal/actors/general"
 	usecases_lifecycle "github.com/JaKoSTaWiND/polymarket_bot/internal/usecases/lifecycle"
 	"go.uber.org/fx"
 )
 
-func CreateGeneralActor(logger *slog.Logger, startBot *usecases_lifecycle.StartBotUC) *actors.GeneralActor {
-	return &actors.GeneralActor{
+func CreateGeneralActor(logger *slog.Logger, startBot *usecases_lifecycle.StartBotUC) *actors_general.GeneralActor {
+	return &actors_general.GeneralActor{
 		Logger: logger,
-		UCS:    actors.UCS{StartBotUC: startBot},
+		UCS:    actors_general.UCS{StartBotUC: startBot},
 	}
 }
 
-func registerGeneralActor(lifecycle fx.Lifecycle, actor *actors.GeneralActor, shutdowner fx.Shutdowner) {
+func registerGeneralActor(lifecycle fx.Lifecycle, actor *actors_general.GeneralActor, shutdowner fx.Shutdowner) {
 	var cancel context.CancelFunc
 	var stopped <-chan struct{}
 

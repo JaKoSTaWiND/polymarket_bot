@@ -1,6 +1,9 @@
 package internal
 
-import "os"
+import (
+	"os"
+	"strconv"
+)
 
 type BootstrapSettings struct {
 	Stage                    string // Окружение приложения из STAGE.
@@ -11,11 +14,18 @@ type BootstrapSettings struct {
 	PolyApiKey               string
 	PolySecret               string
 	PolyPassphrase           string
+	MaxTrackingMarkets       int // Максимальное число одновременно отслеживаемых рынков.
 }
 
-// LoadBootstrapSettings возвращает настройки из окружения без проверки значений.
-// Отсутствующие строковые настройки остаются пустыми; секреты не логируются.
-func LoadBootstrapSettings() BootstrapSettings {
+// LoadBootstrapSettings читает настройки запуска из окружения.
+// Пустой MAX_TRACKING_MARKETS даёт нулевой лимит. Значение, которое нельзя
+// представить неотрицательным int, приводит к ошибке загрузки настроек.
+func LoadBootstrapSettings() (BootstrapSettings, error) {
+	MaxTrackingMarkets, Err := strconv.Atoi(os.Getenv("MAX_TRACKING_MARKETS"))
+	if Err != nil {
+		return BootstrapSettings{}, Err
+	}
+
 	return BootstrapSettings{
 		Stage:                    os.Getenv("STAGE"),
 		LoggerLevel:              os.Getenv("LOGGER_LEVEL"),
@@ -25,5 +35,6 @@ func LoadBootstrapSettings() BootstrapSettings {
 		PolyApiKey:               os.Getenv("POLY_API_KEY"),
 		PolySecret:               os.Getenv("POLY_SECRET"),
 		PolyPassphrase:           os.Getenv("POLY_PASSPHRASE"),
-	}
+		MaxTrackingMarkets:       MaxTrackingMarkets,
+	}, nil
 }

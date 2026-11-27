@@ -8,6 +8,7 @@ import (
 
 func CreateApisState(BootstrapSettings *internal.BootstrapSettings) (*states.ApisState, error) {
 	return &states.ApisState{
+		PolyWalletAddress: BootstrapSettings.PolyWalletAddress,
 		PolyRelayerApiKey: BootstrapSettings.PolyRelayerApiKey,
 		PolyRelayerApiKeyAddress: BootstrapSettings.PolyRelayerApiKeyAddress,
 		PolyApiKey: BootstrapSettings.PolyApiKey,

@@ -34,10 +34,10 @@ type GetBalanceUC struct {
 // Execute записывает в GeneralState.Balance и возвращает баланс кошелька PolyWalletAddress
 // в миллионных долях pUSD на последнем блоке. При ошибке сохраняется предыдущий баланс.
 // Контекст ctx управляет отменой запроса. Пустой или некорректный адрес,
-// сбой RPC или переполнение int64 дают ошибку.
+// сбой RPC или переполнение uint64 дают ошибку.
 //
-//	POLY_WALLET_ADDRESS -> balanceOf(address) -> int64 -> GeneralState.Balance
-func (UC *GetBalanceUC) Execute(ctx context.Context) (int64, error) {
+//	POLY_WALLET_ADDRESS -> balanceOf(address) -> uint64 -> GeneralState.Balance
+func (UC *GetBalanceUC) Execute(ctx context.Context) (uint64, error) {
 	walletAddress := UC.PolyWalletAddress
 	if !polygonWalletAddress.MatchString(walletAddress) {
 		return 0, fmt.Errorf("некорректный адрес кошелька в POLY_WALLET_ADDRESS: %q", walletAddress)
@@ -59,13 +59,13 @@ func (UC *GetBalanceUC) Execute(ctx context.Context) (int64, error) {
 		}
 		return 0, err
 	}
-	atomic.StoreInt64(&UC.GeneralState.Balance, balance)
+	atomic.StoreUint64(&UC.GeneralState.Balance, balance)
 	return balance, nil
 }
 
 // readPUSDBalance отправляет calldata для balanceOf через client с контекстом ctx.
 // Возвращает исходное число микро-pUSD либо ошибку транспорта, RPC или разбора суммы.
-func readPUSDBalance(ctx context.Context, client *http.Client, calldata string) (int64, error) {
+func readPUSDBalance(ctx context.Context, client *http.Client, calldata string) (uint64, error) {
 	const payload = `{"jsonrpc":"2.0","id":1,"method":"eth_call","params":[{"to":%q,"data":%q},"latest"]}`
 	body := fmt.Sprintf(payload, pUSDContract, calldata)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, polygonRPCURL, strings.NewReader(body))
@@ -101,14 +101,14 @@ func readPUSDBalance(ctx context.Context, client *http.Client, calldata string) 
 		return 0, fmt.Errorf("некорректный ответ Polygon RPC на eth_call")
 	}
 
-	// Контракт уже вернул микро-pUSD. 63 бита оставляют сумму в диапазоне int64.
+	// Контракт возвращает микро-pUSD как uint256. В состоянии сумма должна помещаться в uint64.
 	word, ok := strings.CutPrefix(reply.Result, "0x")
 	if !ok || len(word) != 64 {
 		return 0, fmt.Errorf("balanceOf: ожидалось 32-байтовое значение uint256")
 	}
-	amount, err := strconv.ParseUint(word, 16, 63)
+	amount, err := strconv.ParseUint(word, 16, 64)
 	if err != nil {
 		return 0, fmt.Errorf("некорректный баланс pUSD: %w", err)
 	}
-	return int64(amount), nil
+	return amount, nil
 }

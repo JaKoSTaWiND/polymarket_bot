@@ -1,6 +1,8 @@
 package main
 
 import (
+	"log"
+
 	"github.com/JaKoSTaWiND/polymarket_bot/internal"
 	"github.com/JaKoSTaWiND/polymarket_bot/internal/di"
 	di_actors "github.com/JaKoSTaWiND/polymarket_bot/internal/di/actors"
@@ -14,7 +16,10 @@ import (
 )
 
 func main() {
-	BoostrapSettings := internal.LoadBootstrapSettings()
+	BoostrapSettings, err := internal.LoadBootstrapSettings()
+	if err != nil {
+		log.Fatal(err)
+	}
 	App := fx.New(
 		di.BootstrapSettingsProvider(&BoostrapSettings), // Boostrap Settings
 

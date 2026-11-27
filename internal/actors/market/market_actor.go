@@ -1,4 +1,4 @@
-package actors
+package actors_market
 
 import "log/slog"
 
@@ -7,7 +7,7 @@ type MarketActor struct {
 	Logger *slog.Logger // Логгер для событий рынка.
 }
 
-// NewMarketActor возвращает актор рынка с переданным логгером logger.
-func NewMarketActor(logger *slog.Logger) *MarketActor {
+// CreateMarketActor возвращает актор рынка с переданным логгером logger.
+func CreateMarketActor(logger *slog.Logger) *MarketActor {
 	return &MarketActor{Logger: logger}
 }

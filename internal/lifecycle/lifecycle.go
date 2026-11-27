@@ -42,8 +42,6 @@ func (Lifecycle *Lifecycle) EnsureStatus(ctx context.Context, Allowed ...string)
 	return fmt.Errorf(ENSURE_STATUS_ERROR, CurrentStatus, strings.Join(AllowedNames, ", "))
 }
 
-
-
 func (Lifecycle *Lifecycle) ChangeStatus(
 	ctx context.Context,
 	RequestStatus string,
