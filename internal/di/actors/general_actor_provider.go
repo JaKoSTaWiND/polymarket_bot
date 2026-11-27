@@ -12,7 +12,7 @@ import (
 	"go.uber.org/fx"
 )
 
-// CreateGeneralActor получает из Fx состояние бота, HTTP-клиент и операции SDK для снимка аккаунта и двух WebSocket-каналов.
+// CreateGeneralActor собирает из зависимостей Fx актор с доступом к балансу и двум WebSocket-каналам.
 func CreateGeneralActor(
 	logger *slog.Logger,
 	state *states.GeneralState,
@@ -23,7 +23,6 @@ func CreateGeneralActor(
 	apis *states.ApisState,
 	client *http.Client,
 	balance actors_general.BalanceFunc,
-	positions actors_general.OpenPositionsFunc,
 	subscribeUser actors_general.UserSubscribeFunc,
 	readUser actors_general.UserReadFunc,
 ) *actors_general.GeneralActor {
@@ -35,7 +34,6 @@ func CreateGeneralActor(
 		APIs:          apis,
 		HTTPClient:    client,
 		GetBalance:    balance,
-		OpenPositions: positions,
 		SubscribeUser: subscribeUser,
 		ReadUser:      readUser,
 

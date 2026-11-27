@@ -24,12 +24,6 @@ func ListPositionsForAUser(wallet string) (json.RawMessage, error) {
 	return json.Marshal(positions)
 }
 
-// ListOpenPositionsForAUser читает через client все страницы OPEN для wallet, включая дробные остатки.
-// ctx отменяет любой запрос. Каждая позиция сохраняет исходные поля и точность чисел Data API.
-func ListOpenPositionsForAUser(ctx context.Context, client *http.Client, wallet string) ([]json.RawMessage, error) {
-	return listPositions(ctx, client, wallet, "OPEN")
-}
-
 // listPositions загружает через client позиции wallet по выбранным statuses; ошибка отменяет весь результат.
 func listPositions(ctx context.Context, client *http.Client, wallet string, statuses ...string) ([]json.RawMessage, error) {
 	positions := make([]json.RawMessage, 0)

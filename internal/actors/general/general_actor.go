@@ -21,6 +21,15 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 )
 
+// BalanceFunc читает через HTTP-клиент баланс кошелька в микро-pUSD.
+type BalanceFunc = func(context.Context, *http.Client, string) (uint64, error)
+
+// UserSubscribeFunc открывает приватное соединение с переданными ключами API.
+type UserSubscribeFunc = func(context.Context, *websocket.Dialer, sdkws.UserChannelSubscriptionRequest) (*websocket.Conn, error)
+
+// UserReadFunc обслуживает соединение и закрывает его при выходе.
+type UserReadFunc = func(context.Context, *websocket.Conn, func(context.Context, []byte) error) error
+
 // MarketSubscribeFunc открывает Market Channel через dialer и отправляет начальную подписку.
 type MarketSubscribeFunc = func(context.Context, *websocket.Dialer, sdkws.MarketChannelSubscriptionRequest) (*websocket.Conn, error)
 
@@ -34,9 +43,8 @@ type GeneralActor struct {
 	Lifecycle    *lifecycle.Lifecycle // Управляет статусом бота при запуске.
 
 	APIs          *states.ApisState // Кошелёк и ключи для приватной подписки.
-	HTTPClient    *http.Client      // Транспорт для снимка баланса и позиций.
+	HTTPClient    *http.Client      // Транспорт для запроса баланса.
 	GetBalance    BalanceFunc       // Баланс в микро-pUSD.
-	OpenPositions OpenPositionsFunc // Постраничное чтение текущих позиций.
 	SubscribeUser UserSubscribeFunc // Открывает приватный канал аккаунта.
 	ReadUser      UserReadFunc      // Читает приватный канал до отмены контекста.
 
@@ -44,16 +52,17 @@ type GeneralActor struct {
 	SubscribeMarket MarketSubscribeFunc // Открывает общую подписку.
 	UpdateMarket    MarketUpdateFunc    // Добавляет токены в текущую подписку.
 
-	startupMu         sync.Mutex          // Один снимок и один приватный поток на запущенного GeneralActor.
+	startupMu         sync.Mutex          // Ограничивает StartBot одним активным вызовом.
 	marketMu          sync.Mutex          // Сериализует подписки, отправку PING и закрытие соединения.
 	marketConn        *websocket.Conn     // Общее соединение для всех отслеживаемых рынков.
 	subscribedMarkets map[string]struct{} // ConditionID из успешно отправленных подписок текущего соединения.
 }
 
-// StartBot собирает стартовый снимок кошелька и обслуживает User Channel до отмены ctx.
-// Ошибка RPC, Data API или подписки прерывает запуск. Пустой портфель обходится без Market Channel.
+// StartBot получает баланс кошелька и открывает приватную подписку User Channel.
+// После успешной подписки публикует баланс и читает канал до отмены ctx или ошибки чтения.
+// ctx управляет запросом баланса, подключением и чтением. Второй активный вызов возвращает ошибку.
 //
-//	Баланс -> User Channel -> открытые позиции -> Market Channel -> публикация снимка
+//	Запрос баланса -> подписка User Channel -> запись баланса -> чтение канала
 func (actor *GeneralActor) StartBot(ctx context.Context) error {
 	if !actor.startupMu.TryLock() {
 		return errors.New("StartBot уже выполняется")
@@ -74,63 +83,22 @@ func (actor *GeneralActor) StartBot(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("подписка User Channel: %w", err)
 	}
-	// Reader запускает heartbeat сразу, даже если загрузка позиций потребует нескольких страниц.
-	ctx, cancel := context.WithCancelCause(ctx)
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		err := actor.ReadUser(ctx, conn, func(ctx context.Context, payload []byte) error {
-			actor.Logger.DebugContext(ctx, "Получено сообщение User Channel", "bytes", len(payload))
-			return nil
-		})
-		if err == nil {
-			err = io.EOF
-		}
-		cancel(fmt.Errorf("чтение User Channel: %w", err))
-	}()
-	defer func() {
-		cancel(nil)
-		<-done
-	}()
 
-	rows, err := actor.OpenPositions(ctx, actor.HTTPClient, wallet)
-	if cause := context.Cause(ctx); cause != nil {
-		return cause
-	}
-	if err != nil {
-		return fmt.Errorf("открытые позиции: %w", err)
-	}
-	portfolio, err := groupOpenPositions(ctx, actor.HTTPClient, wallet, rows)
-	if cause := context.Cause(ctx); cause != nil {
-		return cause
-	}
-	if err != nil {
-		return err
-	}
-	if len(portfolio.liveMarkets) > 0 {
-		err = actor.startTrackMarkets(ctx, portfolio.liveMarkets, portfolio.liveTokens)
-		if err != nil {
-			if cause := context.Cause(ctx); cause != nil {
-				return cause
-			}
-			return err
-		}
-	}
-
-	actor.marketMu.Lock()
-	for _, id := range portfolio.liveMarkets {
-		marketActor := actor.GeneralState.MarketActorsByConditionID[id]
-		marketActor.Positions = portfolio.byMarket[id]
-		actor.GeneralState.MarketActorsByConditionID[id] = marketActor
-	}
-	actor.GeneralState.OpenPositions = portfolio.byMarket
 	atomic.StoreUint64(&actor.GeneralState.Balance, balance)
-	actor.marketMu.Unlock()
+	actor.Logger.InfoContext(ctx, "Получен стартовый баланс", "balance_micro_pusd", balance)
 
-	actor.Logger.InfoContext(ctx, "Получен стартовый снимок аккаунта", "balance_micro_pusd", balance,
-		"markets_with_positions", len(portfolio.byMarket), "tracked_markets", len(portfolio.liveMarkets))
-	<-ctx.Done()
-	return context.Cause(ctx)
+	// ReadUser поддерживает соединение и закрывает его перед возвратом.
+	err = actor.ReadUser(ctx, conn, func(ctx context.Context, payload []byte) error {
+		actor.Logger.DebugContext(ctx, "Получено сообщение User Channel", "bytes", len(payload))
+		return nil
+	})
+	if cause := context.Cause(ctx); cause != nil {
+		return cause
+	}
+	if err == nil {
+		err = io.EOF
+	}
+	return fmt.Errorf("чтение User Channel: %w", err)
 }
 
 func (actor *GeneralActor) CreateMarketActor(ConditionID string) {
@@ -186,14 +154,6 @@ func (actor *GeneralActor) KillMarketActors(ConditionIDS []string) {
 //
 //	Проверка вместимости -> создание акторов -> подписка или обновление -> при ошибке откат
 func (actor *GeneralActor) StartTrackMarkets(ConditionIDS []string, AssetIDS []string) error {
-	return actor.startTrackMarkets(context.Background(), ConditionIDS, AssetIDS)
-}
-
-// startTrackMarkets подписывается на AssetIDS для ConditionIDS; ctx управляет подключением при запуске.
-func (actor *GeneralActor) startTrackMarkets(ctx context.Context, ConditionIDS []string, AssetIDS []string) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
 	if len(ConditionIDS) == 0 {
 		return errors.New("для отслеживания нужен хотя бы один ConditionID")
 	}
@@ -223,7 +183,7 @@ func (actor *GeneralActor) startTrackMarkets(ctx context.Context, ConditionIDS [
 		}
 		req := sdkws.MarketChannelSubscriptionRequest{AssetIDS: AssetIDS}
 		actor.subscribedMarkets = nil
-		actor.marketConn, err = actor.SubscribeMarket(ctx, actor.WSDialer, req)
+		actor.marketConn, err = actor.SubscribeMarket(context.Background(), actor.WSDialer, req)
 		if err == nil {
 			actor.subscribedMarkets = make(map[string]struct{})
 			go actor.keepMarketChannelAlive(actor.marketConn)
@@ -314,4 +274,3 @@ func (actor *GeneralActor) CloseMarketChannel() {
 
 // func StopTrackMarket()
 // func StopTrackMarkets()
-
