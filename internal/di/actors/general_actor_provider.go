@@ -5,7 +5,6 @@ import (
 	"log/slog"
 
 	actors_general "github.com/JaKoSTaWiND/polymarket_bot/internal/actors/general"
-	usecases_lifecycle "github.com/JaKoSTaWiND/polymarket_bot/internal/usecases/lifecycle"
 	"go.uber.org/fx"
 )
 

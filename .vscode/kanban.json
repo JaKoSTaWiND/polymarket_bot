@@ -17,6 +17,10 @@
             "title": "Doing",
             "tasks": [
                 {
+                    "text": "market channel subscribe/update\n",
+                    "id": "fc3y3f1r6sw1eoxw702uwq03"
+                },
+                {
                     "text": "запуск бота:\n- lifecycle меняет состояние бота\n-  user subscribe channel\n- usecase типа  user subscribe channel\n- general actor при запуске вызывает юзкейс",
                     "id": "zzu7izgen32denvspq06y19k"
                 }
@@ -33,5 +37,5 @@
     ],
     "autosave": true,
     "saveToFile": true,
-    "timestamp": 1795662094607
+    "timestamp": 1795752808965
 }

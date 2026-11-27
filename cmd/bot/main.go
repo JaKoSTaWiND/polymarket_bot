@@ -37,6 +37,9 @@ func main() {
 
 		// SDK
 		di_sdk.SDKClientProvider(), // SDK Client
+		di_sdk.ProfileProvider(),
+		di_sdk.WebSocketProvider(),
+		di_sdk.OtherProvider(),
 
 		// USECASES
 		di_usecases.LifecycleUCsProvider(), // Lifecycle Usecases

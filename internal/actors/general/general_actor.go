@@ -25,9 +25,7 @@ func (GeneralActor *GeneralActor) StartBot(ctx context.Context) error {
 
 	// получениие позиций +
 
-	// создать акторов исходя из полученных позиций, причем если есть 2 позиции на 1 condition_id то для них создается 1 актор и принимает обе позиции в себя
-
-	// если есть открытые позиции, то делает market channel subscribe на них
+	CreateMarketActors()
 	return nil
 }
 

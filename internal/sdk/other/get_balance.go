@@ -1,17 +1,14 @@
-package usecases_sdk
+package sdk_other
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
-	"sync/atomic"
 
-	"github.com/JaKoSTaWiND/polymarket_bot/internal/states"
 	transport_http "github.com/JaKoSTaWiND/polymarket_bot/internal/transport/http"
 )
 
@@ -23,44 +20,21 @@ const (
 
 var polygonWalletAddress = regexp.MustCompile(`^0x[0-9a-fA-F]{40}$`)
 
-// GetBalanceUC читает остаток pUSD по адресу Polygon из настроек запуска.
-type GetBalanceUC struct {
-	Logger            *slog.Logger         // Необязательный журнал ошибок RPC.
-	Client            *http.Client         // HTTP-клиент Polygon RPC. При nil используется клиент проекта.
-	PolyWalletAddress string               // Адрес кошелька из POLY_WALLET_ADDRESS.
-	GeneralState      *states.GeneralState // Общее состояние бота для записи полученного баланса.
-}
-
-// Execute записывает в GeneralState.Balance и возвращает баланс кошелька PolyWalletAddress
-// в миллионных долях pUSD на последнем блоке. При ошибке сохраняется предыдущий баланс.
-// Контекст ctx управляет отменой запроса. Пустой или некорректный адрес,
-// сбой RPC или переполнение uint64 дают ошибку.
-//
-//	POLY_WALLET_ADDRESS -> balanceOf(address) -> uint64 -> GeneralState.Balance
-func (UC *GetBalanceUC) Execute(ctx context.Context) (uint64, error) {
-	walletAddress := UC.PolyWalletAddress
+// GetBalance возвращает баланс кошелька walletAddress в микро-pUSD на последнем блоке Polygon.
+// Контекст ctx позволяет отменить запрос. Если client равен nil, используется HTTP-клиент проекта.
+// При некорректном адресе, сбое RPC или ошибке разбора функция возвращает 0 и ошибку.
+// Сумма, превышающая uint64, также приводит к ошибке.
+func GetBalance(ctx context.Context, client *http.Client, walletAddress string) (uint64, error) {
 	if !polygonWalletAddress.MatchString(walletAddress) {
-		return 0, fmt.Errorf("некорректный адрес кошелька в POLY_WALLET_ADDRESS: %q", walletAddress)
+		return 0, fmt.Errorf("некорректный адрес кошелька Polygon: %q", walletAddress)
 	}
-	if UC.GeneralState == nil {
-		return 0, fmt.Errorf("не задано состояние бота для записи баланса")
-	}
-	client := UC.Client
 	if client == nil {
 		client = transport_http.HttpClient()
 	}
 
 	// В ABI аргумент address занимает 32 байта с 12 нулевыми байтами слева.
 	calldata := "0x70a08231" + "000000000000000000000000" + walletAddress[2:]
-	balance, err := readPUSDBalance(ctx, client, calldata)
-	if err != nil {
-		if UC.Logger != nil {
-			UC.Logger.ErrorContext(ctx, "Не удалось получить баланс pUSD", "wallet", walletAddress, "error", err)
-		}
-		return 0, err
-	}
-	atomic.StoreUint64(&UC.GeneralState.Balance, balance)
-	return balance, nil
+	return readPUSDBalance(ctx, client, calldata)
 }
 
 // readPUSDBalance отправляет calldata для balanceOf через client с контекстом ctx.
@@ -101,7 +75,7 @@ func readPUSDBalance(ctx context.Context, client *http.Client, calldata string) 
 		return 0, fmt.Errorf("некорректный ответ Polygon RPC на eth_call")
 	}
 
-	// Контракт возвращает микро-pUSD как uint256. В состоянии сумма должна помещаться в uint64.
+	// Контракт возвращает микро-pUSD как uint256. Результат должен помещаться в uint64.
 	word, ok := strings.CutPrefix(reply.Result, "0x")
 	if !ok || len(word) != 64 {
 		return 0, fmt.Errorf("balanceOf: ожидалось 32-байтовое значение uint256")
