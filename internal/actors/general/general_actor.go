@@ -99,18 +99,18 @@ func (actor *GeneralActor) StartBot(ctx context.Context) error {
 	return fmt.Errorf("чтение User Channel: %w", err)
 }
 
-// CreateMarketActor загружает рынок по числовому marketID из Gamma и регистрирует актор по ConditionID.
-// Существующий актор сохраняет своё состояние. Сбой загрузки, пустой ConditionID и исчерпание лимита
-// для нового рынка возвращают ошибку.
+// CreateMarketActor загружает рынок по числовому marketID из Gamma и возвращает актор из реестра.
+// Для нового ConditionID регистрирует актор под marketMu. Существующий актор сохраняет своё состояние.
+// Сбой загрузки, пустой ConditionID и исчерпание лимита для нового рынка возвращают ошибку.
 //
-//	Загрузка рынка -> проверка ConditionID и лимита -> регистрация актора
-func (actor *GeneralActor) CreateMarketActor(marketID string) error {
+//	[Gamma] -> [Проверка ConditionID и лимита] -> [Получение или регистрация актора]
+func (actor *GeneralActor) CreateMarketActor(marketID string) (*actors_market.MarketActor, error) {
 	market, err := sdk_markets.GetMarketByID(marketID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if market.ConditionID == "" {
-		return fmt.Errorf("рынок %q не содержит ConditionID", marketID)
+		return nil, fmt.Errorf("рынок %q не содержит ConditionID", marketID)
 	}
 
 	// Проверка лимита и запись выполняются под одной блокировкой.
@@ -118,15 +118,16 @@ func (actor *GeneralActor) CreateMarketActor(marketID string) error {
 	defer actor.marketMu.Unlock()
 
 	state := actor.GeneralState
-	if _, exists := state.MarketActorsByConditionID[market.ConditionID]; exists {
-		return nil
+	if marketActor, exists := state.MarketActorsByConditionID[market.ConditionID]; exists {
+		return marketActor, nil
 	}
 	if len(state.MarketActorsByConditionID) >= state.MaxTrackingMarkets {
-		return fmt.Errorf("достигнут лимит акторов рынков (%d)", state.MaxTrackingMarkets)
+		return nil, fmt.Errorf("достигнут лимит акторов рынков (%d)", state.MaxTrackingMarkets)
 	}
 
-	state.MarketActorsByConditionID[market.ConditionID] = actors_market.CreateMarketActor(actor.Logger, market)
-	return nil
+	marketActor := actors_market.CreateMarketActor(actor.Logger, market)
+	state.MarketActorsByConditionID[market.ConditionID] = marketActor
+	return marketActor, nil
 }
 
 // KillMarketActor удаляет актора по conditionID и освобождает его место.
@@ -137,7 +138,63 @@ func (actor *GeneralActor) KillMarketActor(conditionID string) {
 	delete(actor.GeneralState.MarketActorsByConditionID, conditionID)
 }
 
-// func StartTrackMarket()
+// StartTrackMarket подписывает оба исхода рынка с числовым marketID из Gamma.
+// ctx управляет открытием WebSocket. Ошибка создания актора завершает вызов до подписки.
+// При сбое WebSocket актор остаётся в реестре для повторной попытки.
+//
+//	[CreateMarketActor] -> [Проверка реестра и подписки]
+//	                       +-- подписка есть -> возврат nil
+//	                       +-- соединения нет -> SubscribeMarket
+//	                       +-- соединение есть -> UpdateMarket
+func (actor *GeneralActor) StartTrackMarket(ctx context.Context, marketID string) error {
+	marketActor, err := actor.CreateMarketActor(marketID)
+	if err != nil {
+		return err
+	}
+
+	actor.marketMu.Lock()
+	defer actor.marketMu.Unlock()
+
+	market := marketActor.Market
+	// KillMarketActor мог удалить актор до захвата блокировки.
+	if actor.GeneralState.MarketActorsByConditionID[market.ConditionID] != marketActor {
+		return fmt.Errorf("актор рынка %q удалён перед подпиской", marketID)
+	}
+	if _, subscribed := actor.subscribedMarkets[market.ConditionID]; subscribed {
+		return nil
+	}
+	assetIDs := []string{market.PrimaryToken.AssetID, market.SecondaryToken.AssetID}
+
+	// После разрыва соединения реестр может содержать акторы без подписки.
+	if actor.marketConn == nil {
+		conn, err := actor.SubscribeMarket(ctx, actor.WSDialer, sdkws.MarketChannelSubscriptionRequest{
+			AssetIDS: assetIDs,
+			Type:     "market",
+		})
+		if err != nil {
+			return fmt.Errorf("подписка Market Channel для рынка %q: %w", marketID, err)
+		}
+
+		actor.marketConn = conn
+		actor.subscribedMarkets = map[string]struct{}{market.ConditionID: {}}
+		go actor.keepMarketChannelAlive(conn)
+		return nil
+	}
+
+	// У обновления свой дедлайн: предыдущий дедлайн PING мог истечь.
+	if err := actor.marketConn.SetWriteDeadline(time.Now().Add(5 * time.Second)); err != nil {
+		return fmt.Errorf("дедлайн записи Market Channel: %w", err)
+	}
+	if err := actor.UpdateMarket(actor.marketConn, sdkws.MarketChannelUpdateRequest{
+		Operation: "subscribe",
+		AssetIDS:  assetIDs,
+	}); err != nil {
+		return fmt.Errorf("добавление рынка %q в Market Channel: %w", marketID, err)
+	}
+
+	actor.subscribedMarkets[market.ConditionID] = struct{}{}
+	return nil
+}
 
 // OnMessage записывает в журнал исходный текст сообщения Market Channel из payload.
 func (actor *GeneralActor) OnMessage(payload []byte) {
